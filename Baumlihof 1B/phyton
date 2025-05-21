@@ -1,0 +1,255 @@
+from flask import Flask, render_template_string, request, redirect, url_for, session
+
+app = Flask(__name__)
+app.secret_key = 'geheimer_schlüssel'
+
+# Inhalte (temporärer Speicher)
+test_inhalt = "Hier steht der Test für diese Woche."
+lernziel_inhalt = "Mathematik: Brüche multiplizieren."
+tage_inhalt = "22.05.2025: Sporttag"
+
+# Login-Seite
+@app.route("/", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username").strip()
+        password = request.form.get("password").strip()
+
+        if password != "Schule":
+            error = "Falsches Passwort"
+        else:
+            session["username"] = username
+            session["is_admin"] = (username == "1B Schule")
+            return redirect(url_for("home"))
+
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+      <meta charset="UTF-8">
+      <title>Login</title>
+      <style>
+        body {
+          background: linear-gradient(135deg, #667eea, #764ba2);
+          font-family: Arial, sans-serif;
+          color: white;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .login-box {
+          background-color: rgba(0,0,0,0.5);
+          padding: 40px;
+          border-radius: 12px;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        input, button {
+          width: 100%;
+          padding: 12px;
+          margin: 10px 0;
+          border: none;
+          border-radius: 8px;
+        }
+        button {
+          background-color: #00d2ff;
+          color: white;
+          font-size: 16px;
+          cursor: pointer;
+        }
+        .error { color: #ff7777; }
+      </style>
+    </head>
+    <body>
+      <div class="login-box">
+        <h2>Login</h2>
+        {% if error %}<p class="error">{{ error }}</p>{% endif %}
+        <form method="post">
+          <input type="text" name="username" placeholder="Benutzername" required>
+          <input type="password" name="password" placeholder="Passwort" required>
+          <button type="submit">Einloggen</button>
+        </form>
+      </div>
+    </body>
+    </html>
+    """, error=error)
+
+
+# Home-Seite mit Navigation
+@app.route("/home")
+def home():
+    if "username" not in session:
+        return redirect(url_for("login"))
+    return render_template_string("""
+    <html>
+    <head>
+      <title>Übersicht</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background: #1f1f38;
+          color: white;
+          text-align: center;
+          padding: 60px;
+        }
+        h1 { margin-bottom: 30px; }
+        a {
+          display: inline-block;
+          margin: 12px;
+          padding: 14px 28px;
+          background: #00d2ff;
+          color: black;
+          border-radius: 10px;
+          text-decoration: none;
+          font-weight: bold;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Willkommen {{ session['username'] }}</h1>
+      <a href="{{ url_for('stundenplan') }}">Stundenplan</a>
+      <a href="{{ url_for('test') }}">Test</a>
+      <a href="{{ url_for('lernziel') }}">Lernziel</a>
+      <a href="{{ url_for('spezielle_tage') }}">Spezielle Tage</a>
+    </body>
+    </html>
+    """)
+
+
+# Stundenplan (PDF eingebettet)
+@app.route("/stundenplan")
+def stundenplan():
+    return render_template_string("""
+    <html>
+    <head>
+      <title>Stundenplan</title>
+      <style>
+        body { background: #1f1f38; color: white; font-family: Arial; padding: 30px; text-align: center; }
+        iframe { width: 90%; height: 80vh; border-radius: 10px; border: none; box-shadow: 0 0 15px black; }
+        a { color: #00d2ff; display: inline-block; margin-top: 20px; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <h1>Stundenplan</h1>
+      <iframe src="https://www.sek-baeumlihof.ch/Planung%20des%20Schuljahres/copy_of_stundenplaene/stundenplaene-1-sek-1/stundenplan-sekundarschule-klasse-1ba.pdf/@@download/file/Stundenplan%20Sekundarschule%20Klasse%201bA.pdf?inline=true"></iframe>
+      <br><a href="{{ url_for('home') }}">Zurück</a>
+    </body>
+    </html>
+    """)
+
+
+# Test-Seite
+@app.route("/test", methods=["GET", "POST"])
+def test():
+    global test_inhalt
+    is_admin = session.get("is_admin", False)
+
+    if request.method == "POST" and is_admin:
+        test_inhalt = request.form.get("inhalt", "")
+
+    return render_template_string("""
+    <html>
+    <head>
+      <title>Test</title>
+      <style>
+        body { background: #1f1f38; color: white; font-family: Arial; padding: 30px; }
+        textarea { width: 100%; height: 200px; border-radius: 10px; font-size: 16px; padding: 10px; }
+        button { padding: 10px 20px; border-radius: 8px; background: #00d2ff; border: none; font-weight: bold; cursor: pointer; }
+        p { background: #333; padding: 20px; border-radius: 10px; }
+        a { color: #00d2ff; display: inline-block; margin-top: 20px; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <h1>Test</h1>
+      {% if is_admin %}
+        <form method="post">
+          <textarea name="inhalt">{{ inhalt }}</textarea><br>
+          <button type="submit">Speichern</button>
+        </form>
+      {% else %}
+        <p>{{ inhalt }}</p>
+      {% endif %}
+      <a href="{{ url_for('home') }}">Zurück</a>
+    </body>
+    </html>
+    """, is_admin=is_admin, inhalt=test_inhalt)
+
+
+# Lernziel-Seite
+@app.route("/lernziel", methods=["GET", "POST"])
+def lernziel():
+    global lernziel_inhalt
+    is_admin = session.get("is_admin", False)
+
+    if request.method == "POST" and is_admin:
+        lernziel_inhalt = request.form.get("inhalt", "")
+
+    return render_template_string("""
+    <html>
+    <head>
+      <title>Lernziel</title>
+      <style>
+        body { background: #1f1f38; color: white; font-family: Arial; padding: 30px; }
+        textarea, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 10px; }
+        button { background: #00d2ff; border: none; font-weight: bold; cursor: pointer; }
+        p { background: #333; padding: 20px; border-radius: 10px; }
+        a { color: #00d2ff; display: inline-block; margin-top: 20px; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <h1>Lernziel</h1>
+      {% if is_admin %}
+        <form method="post">
+          <textarea name="inhalt">{{ inhalt }}</textarea>
+          <button type="submit">Speichern</button>
+        </form>
+      {% else %}
+        <p>{{ inhalt }}</p>
+      {% endif %}
+      <a href="{{ url_for('home') }}">Zurück</a>
+    </body>
+    </html>
+    """, is_admin=is_admin, inhalt=lernziel_inhalt)
+
+
+# Spezielle Tage-Seite
+@app.route("/spezielle-tage", methods=["GET", "POST"])
+def spezielle_tage():
+    global tage_inhalt
+    is_admin = session.get("is_admin", False)
+
+    if request.method == "POST" and is_admin:
+        tage_inhalt = request.form.get("inhalt", "")
+
+    return render_template_string("""
+    <html>
+    <head>
+      <title>Spezielle Tage</title>
+      <style>
+        body { background: #1f1f38; color: white; font-family: Arial; padding: 30px; }
+        textarea, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 10px; }
+        button { background: #00d2ff; border: none; font-weight: bold; cursor: pointer; }
+        p { background: #333; padding: 20px; border-radius: 10px; }
+        a { color: #00d2ff; display: inline-block; margin-top: 20px; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <h1>Spezielle Tage</h1>
+      {% if is_admin %}
+        <form method="post">
+          <textarea name="inhalt">{{ inhalt }}</textarea>
+          <button type="submit">Speichern</button>
+        </form>
+      {% else %}
+        <p>{{ inhalt }}</p>
+      {% endif %}
+      <a href="{{ url_for('home') }}">Zurück</a>
+    </body>
+    </html>
+    """, is_admin=is_admin, inhalt=tage_inhalt)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
